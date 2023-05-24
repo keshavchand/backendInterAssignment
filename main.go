@@ -5,10 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 )
@@ -36,14 +34,7 @@ func HandleCommand(w http.ResponseWriter, r *http.Request) {
 	}
 
 	reader := io.LimitReader(r.Body, 1024)
-	data, err := ioutil.ReadAll(reader)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, err.Error())
-		fmt.Fprintf(w, err.Error())
-		return
-	}
-
-	err = json.Unmarshal([]byte(data), &req)
+	err := json.NewDecoder(reader).Decode(&req)
 	if err != nil {
 		jsonParsingError(w, r, err)
 		return

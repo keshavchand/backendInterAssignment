@@ -22,6 +22,7 @@ type QueueNode struct {
 type Queue struct {
 	tail   *QueueNode
 	status WaitingStatus
+	cond   *sync.Cond
 }
 
 type Value struct {
@@ -54,7 +55,7 @@ func (v *Value) Expired() bool {
 
 var (
 	ErrorKeyNotFound       = errors.New("key not found")
-	ErrorKeyPresent        = errors.New("key already exists")
+	ErrorKeyExists         = errors.New("key already exists")
 	ErrorEmptyQueue        = errors.New("queue is empty")
 	ErrorManyWaiterOnQueue = errors.New("many waiter on queue")
 )
@@ -76,7 +77,7 @@ func (s *Storage) SetIfDoesntExists(key, value string, expiry *time.Time) error 
 	defer s.kvLock.Unlock()
 
 	if vOld, ok := s.KV[key]; !ok || !vOld.Expired() {
-		return ErrorKeyPresent
+		return ErrorKeyExists
 	}
 
 	s.KV[key] = Value{value, expiry}
@@ -117,10 +118,17 @@ func (s *Storage) QPush(key string, value []string) {
 	s.queueLock.Lock()
 	defer s.queueLock.Unlock()
 
-	queue := s.Queue[key]
+	queue, found := s.Queue[key]
+	if !found {
+		queue = new(Queue)
+	}
 	head.next = queue.tail
 	queue.tail = tail
 	s.Queue[key] = queue
+
+	if queue.status == CurrentlyWaiting {
+		queue.cond.Signal()
+	}
 }
 
 func (s *Storage) QPop(key string) (string, error) {
@@ -136,20 +144,24 @@ func (s *Storage) QPopTimeout(key string, time *time.Time) (string, error) {
 		if time == nil {
 			return "", ErrorEmptyQueue
 		}
+		queue = new(Queue)
+		s.Queue[key] = queue
+	}
 
-		q := new(Queue)
-		s.Queue[key] = q
-		err := s.waitForValue(q, *time)
+	for queue.tail == nil {
+		if time == nil {
+			return "", ErrorEmptyQueue
+		}
+
+		err := s.waitForValue(queue, *time)
 		if err != nil {
 			return "", err
 		}
+
+		time = nil
 	}
 
 	node := queue.tail
-	if node == nil {
-		return "", nil
-	}
-
 	queue.tail = queue.tail.next
 	if queue.tail == nil {
 		delete(s.Queue, key)
@@ -167,14 +179,14 @@ func (s *Storage) waitForValue(q *Queue, timeout time.Time) error {
 	}
 
 	q.status = CurrentlyWaiting
-	cond := sync.NewCond(&s.queueLock)
+	q.cond = sync.NewCond(&s.queueLock)
 
 	go func() {
 		<-time.After(time.Until(timeout))
-		cond.Signal()
+		q.cond.Signal()
 	}()
 
-	cond.Wait()
+	q.cond.Wait()
 	q.status = NoWaiting
 	return nil
 }
