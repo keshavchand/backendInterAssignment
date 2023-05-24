@@ -161,7 +161,7 @@ func TestScenarios(t *testing.T) {
 		},
 	}
 
-	for idx, t := range table {
+	for _, t := range table {
 		storage := NewStorage()
 		for _, fn := range t {
 			fn(storage)
