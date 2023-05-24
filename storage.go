@@ -39,10 +39,13 @@ type Storage struct {
 }
 
 func NewStorage() *Storage {
-	return &Storage{
+	s := &Storage{
 		KV:    make(map[string]Value),
 		Queue: make(map[string]*Queue),
 	}
+
+	go s.runStorageGC()
+	return s
 }
 
 func (v *Value) Expired() bool {
@@ -59,6 +62,21 @@ var (
 	ErrorEmptyQueue        = errors.New("queue is empty")
 	ErrorManyWaiterOnQueue = errors.New("many waiter on queue")
 )
+
+func (s *Storage) runStorageGC() {
+	ticker := time.NewTicker(10 * time.Second)
+
+	for {
+		<-ticker.C
+		s.kvLock.Lock()
+		for k, v := range s.KV {
+			if v.Expired() {
+				delete(s.KV, k)
+			}
+		}
+		s.kvLock.Unlock()
+	}
+}
 
 func (s *Storage) SetIfExists(key, value string, expiry *time.Time) error {
 	s.kvLock.Lock()
