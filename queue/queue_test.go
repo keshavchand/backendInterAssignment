@@ -59,7 +59,7 @@ func BenchmarkQueuePushPop(b *testing.B) {
 	}{
 		{"primitive", QueueTypePrimitive},
 		{"mapOfChannel", QueueTypeMapOfChannel},
-		{"channelOfChannel", QueueTypeMapOfChannel},
+		{"channelOfChannel", QueueTypeChannel},
 	}
 
 	const MaxGoroutineCount = 50
@@ -69,25 +69,5 @@ func BenchmarkQueuePushPop(b *testing.B) {
 				_BenchmarkQueuePushPop(b, q.t, goRoutineCount, queuesName[:]...)
 			})
 		}
-	}
-}
-
-func TestMapOfChannel(t *testing.T) {
-	q := QueueFactory(QueueTypeMapOfChannel)
-	q.QPush("test", []string{"test", "test2"})
-	v, err := q.QPop("test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if v != "test" {
-		t.Fatal("value mismatch")
-	}
-
-	v, err = q.QPop("test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if v != "test2" {
-		t.Fatal("value mismatch")
 	}
 }

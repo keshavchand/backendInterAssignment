@@ -37,6 +37,7 @@ type ChannelofChannels struct {
 
 var ChannelPool = sync.Pool{
 	New: func() any {
+		// XXX: Not sure why but the performance reduced after creating buffered channel
 		return make(chan Resp, 0)
 	},
 }
