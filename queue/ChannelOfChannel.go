@@ -49,6 +49,7 @@ type QI struct {
 func newQI() *QI {
 	return &QI{
 		c: make(chan string, 100),
+		r: &atomic.Bool{},
 	}
 }
 
@@ -78,7 +79,7 @@ func (q *ChannelofChannels) Manager() {
 		case QueueGet:
 			queue, found := qinfo[qs.Key]
 			if !found {
-				qs.Resp <- Resp{Error: ErrorKeyNotFound}
+				qs.Resp <- Resp{Error: ErrorEmptyQueue}
 				continue
 			}
 
@@ -96,15 +97,14 @@ func (q *ChannelofChannels) Manager() {
 		case QueueGetTimeout:
 			queue, found := qinfo[qs.Key]
 			if !found {
-				qs.Resp <- Resp{Error: ErrorKeyNotFound}
-				continue
+				queue = newQI()
+				qinfo[qs.Key] = queue
 			}
 
-			if queue.r.Load() {
+			if !queue.r.CompareAndSwap(false, true) {
 				qs.Resp <- Resp{Error: ErrorManyWaiterOnQueue}
 				continue
 			}
-			queue.r.Store(true)
 
 			wg.Add(1)
 			go func(queue *QI) {
@@ -137,7 +137,11 @@ func (q *ChannelofChannels) QPop(key string) (string, error) {
 
 func (q *ChannelofChannels) QPopTimeout(key string, time *time.Time) (string, error) {
 	resp := ChannelPool.Get().(chan Resp)
-	q.RequestQueue <- QueueGetTimeout{Key: key, Resp: resp, Time: *time}
+	if time == nil {
+		q.RequestQueue <- QueueGet{Key: key, Resp: resp}
+	} else {
+		q.RequestQueue <- QueueGetTimeout{Key: key, Resp: resp, Time: *time}
+	}
 	r := <-resp
 	ChannelPool.Put(resp)
 	return r.Value, r.Error

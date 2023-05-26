@@ -7,34 +7,6 @@ import (
 	"testing"
 )
 
-const (
-	QueueTypePrimitive = iota
-	QueueTypeMapOfChannel
-	QueueTypeChannel
-)
-
-func QueueFactory(t int) Queue {
-	switch t {
-	case QueueTypePrimitive:
-		q := new(OneToManyQueuePrimitive)
-		q.Queue = make(map[string]*PrimitiveQueue, 0)
-		return q
-
-	case QueueTypeMapOfChannel:
-		q := new(MapOfChannel)
-		q.Queue = make(map[string]chan string, 0)
-		return q
-
-	case QueueTypeChannel:
-		q := new(ChannelofChannels)
-		q.RequestQueue = make(chan QueueRequestInfo, 100)
-		go q.Manager()
-		return q
-	default:
-		panic("NOT IMPLEMENTED")
-	}
-}
-
 func BenchmarkQueuePushPop(b *testing.B) {
 	var queuesName [1000]string
 	for i := 0; i < 1000; i++ {
