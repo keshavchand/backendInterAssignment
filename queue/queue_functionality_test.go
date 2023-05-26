@@ -132,7 +132,7 @@ func _TestScenarios(t *testing.T, queueType int) {
 				start := time.Now()
 
 				tenExpire := new(time.Time)
-				*tenExpire = time.Now().Add(10 * time.Second)
+				*tenExpire = time.Now().Add(1 * time.Second)
 				value, err := q.QPopTimeout("key", tenExpire)
 				if err != ErrorEmptyQueue {
 					t.Errorf("Expected error, got %+v", err)
@@ -149,6 +149,34 @@ func _TestScenarios(t *testing.T, queueType int) {
 		queue := QueueFactory(queueType)
 		for _, fn := range t {
 			fn(queue)
+		}
+	}
+}
+
+func TestQueueFunctionality(t *testing.T) {
+	t.Run("QueueTypePrimitive", func(t *testing.T) {
+		_TestQueueFunctionality(t, QueueTypePrimitive)
+	})
+	t.Run("QueueTypeMapOfChannel", func(t *testing.T) {
+		_TestQueueFunctionality(t, QueueTypeMapOfChannel)
+	})
+	t.Run("QueueTypeChannel", func(t *testing.T) {
+		_TestQueueFunctionality(t, QueueTypeChannel)
+	})
+}
+
+func _TestQueueFunctionality(t *testing.T, queueType int) {
+	queue := QueueFactory(queueType)
+	values := []string{"value1", "value2", "value3"}
+	queue.QPush("key1", values)
+
+	for _, val := range values {
+		v, e := queue.QPop("key1")
+		if e != nil {
+			t.Fatalf("Unexpected Error: %+v", e)
+		}
+		if v != val {
+			t.Fatalf("Expected %s got %s", val, v)
 		}
 	}
 }

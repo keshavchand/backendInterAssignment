@@ -18,6 +18,7 @@ type QueueNode struct {
 }
 
 type PrimitiveQueue struct {
+	head   *QueueNode
 	tail   *QueueNode
 	status WaitingStatus
 	cond   *sync.Cond
@@ -57,8 +58,14 @@ func (q *OneToManyQueuePrimitive) QPush(key string, value []string) {
 		queue = new(PrimitiveQueue)
 	}
 
-	head.next = queue.tail
-	queue.tail = tail
+	if queue.head == nil {
+		queue.head = head
+		queue.tail = tail
+	} else {
+		queue.tail.next = head
+		queue.tail = tail
+	}
+
 	q.Queue[key] = queue
 
 	if queue.status == CurrentlyWaiting {
@@ -83,7 +90,7 @@ func (q *OneToManyQueuePrimitive) QPopTimeout(key string, time *time.Time) (stri
 		q.Queue[key] = queue
 	}
 
-	for queue.tail == nil {
+	for queue.head == nil {
 		if time == nil {
 			return "", ErrorEmptyQueue
 		}
@@ -96,11 +103,16 @@ func (q *OneToManyQueuePrimitive) QPopTimeout(key string, time *time.Time) (stri
 		time = nil
 	}
 
-	node := queue.tail
-	queue.tail = queue.tail.next
-	if queue.tail == nil {
+	node := queue.head
+	if queue.head == queue.tail {
+		// Only Element
+		queue.head = nil
+		queue.tail = nil
+	}
+	if queue.head == nil {
 		delete(q.Queue, key)
 	} else {
+		queue.head = queue.head.next
 		q.Queue[key] = queue
 	}
 
