@@ -130,7 +130,6 @@ func (s *Storage) QPush(key string, value []string) {
 
 	for _, v := range value[1:] {
 		tail = &QueueNode{v, tail}
-		tail = tail.next
 	}
 
 	s.queueLock.Lock()
